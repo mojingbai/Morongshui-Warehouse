@@ -2,62 +2,107 @@ name: Build SheepFarmerLite APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
     name: Build APK
-    runs-on: ubuntu-22.04  # 用 22.04 更稳，和新版 SDK 完全兼容
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Java 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
 
-      # 手动下载 + 正确配置，完全避开所有第三方动作的坑
       - name: Setup Android SDK
+        shell: bash
         run: |
-          ANDROID_HOME="$GITHUB_WORKSPACE/android-sdk"
-          mkdir -p "$ANDROID_HOME"
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          set -euo pipefail
 
-          # 下载最新版命令行工具（用能正常访问的地址）
+          export ANDROID_HOME="$GITHUB_WORKSPACE/android-sdk"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+
           cd /tmp
-          curl -L -o cmdline-tools.zip "https://dl.google.com/android/repository/commandlinetools-linux-11076715_latest.zip"
-          unzip -q cmdline-tools.zip -d "$ANDROID_HOME/"
 
-          # 按 Google 要求的目录结构摆放（关键！结构错 sdkmanager 就找不到自己）
-          mkdir -p "$ANDROID_HOME/cmdline-tools"
-          mv "$ANDROID_HOME/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
-          mkdir -p "$ANDROID_HOME/cmdline-tools"
-          mv "$ANDROID_HOME/cmdline-tools/latest" "$ANDROID_HOME/cmdline-tools/"
+          SDK_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076715_latest.zip"
 
-          # 加入环境变量
-          echo "PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH" >> $GITHUB_ENV
+          echo "Downloading Android command-line tools..."
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "$SDK_URL" \
+            --output cmdline-tools.zip
 
-          # 接受许可并安装组件
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          echo "Checking downloaded ZIP..."
+          if ! unzip -tq cmdline-tools.zip; then
+            echo "::error::Android SDK download is not a valid ZIP file."
+            echo "Please check network access to dl.google.com."
+            exit 1
+          fi
+
+          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+          unzip -q cmdline-tools.zip -d /tmp/android-sdk-tools
+
+          if [ ! -f /tmp/android-sdk-tools/cmdline-tools/bin/sdkmanager ]; then
+            echo "::error::sdkmanager was not found in the downloaded archive."
+            exit 1
+          fi
+
+          cp -a /tmp/android-sdk-tools/cmdline-tools/. \
+            "$ANDROID_HOME/cmdline-tools/latest/"
+
+          echo "Installing Android SDK components..."
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses || true
+
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0"
+
+      - name: Check Gradle files
+        shell: bash
+        run: |
+          set -e
+          test -f settings.gradle || test -f settings.gradle.kts
+          test -f build.gradle || test -f build.gradle.kts
+          test -f app/build.gradle || test -f app/build.gradle.kts
 
       - name: Grant execute permission
-        run: chmod +x ./gradlew
+        run: |
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+          else
+            echo "::error::gradlew is missing from the repository."
+            echo "Upload the Gradle wrapper files or generate them in Android Studio."
+            exit 1
+          fi
 
       - name: Build APK
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: List APK files
-        run: find . -name "*.apk" -type f
+        if: always()
+        run: find app/build/outputs -type f -name "*.apk" 2>/dev/null || true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: SheepFarmerLite-APK
           path: app/build/outputs/apk/release/*.apk
