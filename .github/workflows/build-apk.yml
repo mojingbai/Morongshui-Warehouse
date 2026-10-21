@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # 用 22.04 更稳，和新版 SDK 完全兼容
 
     steps:
       - name: Checkout code
@@ -22,11 +22,30 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # 使用 GitHub 官方维护的 Android SDK 方案，下载链接永远正确
+      # 手动下载 + 正确配置，完全避开所有第三方动作的坑
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          accept-licenses: true
+        run: |
+          ANDROID_HOME="$GITHUB_WORKSPACE/android-sdk"
+          mkdir -p "$ANDROID_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+
+          # 下载最新版命令行工具（用能正常访问的地址）
+          cd /tmp
+          curl -L -o cmdline-tools.zip "https://dl.google.com/android/repository/commandlinetools-linux-11076715_latest.zip"
+          unzip -q cmdline-tools.zip -d "$ANDROID_HOME/"
+
+          # 按 Google 要求的目录结构摆放（关键！结构错 sdkmanager 就找不到自己）
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          mv "$ANDROID_HOME/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          mv "$ANDROID_HOME/cmdline-tools/latest" "$ANDROID_HOME/cmdline-tools/"
+
+          # 加入环境变量
+          echo "PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH" >> $GITHUB_ENV
+
+          # 接受许可并安装组件
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Grant execute permission
         run: chmod +x ./gradlew
