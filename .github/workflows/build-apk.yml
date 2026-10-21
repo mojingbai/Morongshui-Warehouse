@@ -22,35 +22,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      # 使用 GitHub 官方维护的 Android SDK 方案，下载链接永远正确
       - name: Setup Android SDK
-        run: |
-          # 不用 set -e，避免中间一步失败整体终止
-          ANDROID_HOME="$GITHUB_WORKSPACE/android-sdk"
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH" >> $GITHUB_ENV
-
-          echo "Creating directories..."
-          mkdir -p "$ANDROID_HOME"
-          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
-
-          cd /tmp
-          echo "Downloading commandlinetools..."
-          wget -v https://dl.google.com/android/repository/commandlinetools-linux-11076715_latest.zip -O cmdline-tools.zip
-          
-          echo "Unzipping..."
-          unzip -q cmdline-tools.zip -d "$ANDROID_HOME/"
-
-          echo "Moving files..."
-          mv "$ANDROID_HOME/cmdline-tools/bin" "$ANDROID_HOME/cmdline-tools/latest/" || true
-          mv "$ANDROID_HOME/cmdline-tools/lib" "$ANDROID_HOME/cmdline-tools/latest/" || true
-          mv "$ANDROID_HOME/cmdline-tools/NOTICE.txt" "$ANDROID_HOME/cmdline-tools/latest/" || true
-          mv "$ANDROID_HOME/cmdline-tools/source.properties" "$ANDROID_HOME/cmdline-tools/latest/" || true
-
-          echo "Accepting licenses..."
-          yes | sdkmanager --licenses || true
-
-          echo "Installing SDK components..."
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+        uses: android-actions/setup-android@v3
+        with:
+          accept-licenses: true
 
       - name: Grant execute permission
         run: chmod +x ./gradlew
