@@ -1,35 +1,79 @@
 name: Build SheepFarmerLite APK
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    name: Build APK
-    runs-on: ubuntu-latest
-    # 使用预装 Android SDK 的镜像，不用自己下载！
-    container:
-      image: mingc/android-build-box:latest
+    runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Grant execute permission
-        run: chmod +x ./gradlew
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-      - name: Build APK
+      - name: Check project files
+        shell: bash
+        run: |
+          set -eu
+          test -f settings.gradle || test -f settings.gradle.kts
+          test -f build.gradle || test -f build.gradle.kts
+          test -f app/build.gradle || test -f app/build.gradle.kts
+
+          if [ ! -f gradlew ]; then
+            echo "::error::gradlew is missing"
+            exit 1
+          fi
+
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "::error::Gradle wrapper JAR is missing"
+            exit 1
+          fi
+
+          if [ ! -f gradle/wrapper/gradle-wrapper.properties ]; then
+            echo "::error::Gradle wrapper properties are missing"
+            exit 1
+          fi
+
+      - name: Fix Gradle Wrapper
+        shell: bash
+        run: |
+          set -eu
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        shell: bash
+        run: |
+          set -eu
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build release APK
+        shell: bash
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: List APK files
-        run: find . -name "*.apk" -type f
+      - name: Show generated APK
+        if: always()
+        shell: bash
+        run: find app/build/outputs -type f -name "*.apk" 2>/dev/null || true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: SheepFarmerLite-APK
           path: app/build/outputs/apk/release/*.apk
