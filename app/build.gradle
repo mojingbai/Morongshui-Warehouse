@@ -22,13 +22,17 @@ android {
             def keyAliasValue = System.getenv("KEY_ALIAS")
             def keyPasswordValue = System.getenv("KEY_PASSWORD")
 
-            if (keystorePath && keystorePasswordValue &&
-                keyAliasValue && keyPasswordValue) {
-                storeFile file(keystorePath)
-                storePassword keystorePasswordValue
-                keyAlias keyAliasValue
-                keyPassword keyPasswordValue
+            if (!keystorePath || !keystorePasswordValue ||
+                !keyAliasValue || !keyPasswordValue) {
+                throw new GradleException(
+                    "Release signing configuration is missing. Check GitHub Actions Secrets."
+                )
             }
+
+            storeFile file(keystorePath)
+            storePassword keystorePasswordValue
+            keyAlias keyAliasValue
+            keyPassword keyPasswordValue
         }
     }
 
