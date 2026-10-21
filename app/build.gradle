@@ -1,14 +1,41 @@
+
 plugins {
     id 'com.android.application'
 }
+
 android {
     namespace 'com.example.sheepfarmerlite'
     compileSdk 35
+
     defaultConfig {
         applicationId 'com.example.sheepfarmerlite'
         minSdk 23
         targetSdk 35
         versionCode 1
         versionName '1.0'
+    }
+
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv("KEYSTORE_PATH")
+            def keystorePasswordValue = System.getenv("KEYSTORE_PASSWORD")
+            def keyAliasValue = System.getenv("KEY_ALIAS")
+            def keyPasswordValue = System.getenv("KEY_PASSWORD")
+
+            if (keystorePath && keystorePasswordValue &&
+                keyAliasValue && keyPasswordValue) {
+                storeFile file(keystorePath)
+                storePassword keystorePasswordValue
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
     }
 }
