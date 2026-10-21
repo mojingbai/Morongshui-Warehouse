@@ -23,16 +23,10 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Android SDK
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y android-sdk
-          echo "ANDROID_HOME=/usr/lib/android-sdk" >> $GITHUB_ENV
-
-      # 自动生成完整 Gradle wrapper，不用你电脑上有任何文件
-      - name: Generate Gradle wrapper
-        run: |
-          sudo apt-get install -y gradle
-          gradle wrapper --gradle-version 8.5
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          build-tools: "34.0.0"
 
       - name: Grant execute permission
         run: chmod +x ./gradlew
@@ -40,8 +34,8 @@ jobs:
       - name: Build APK
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Show APK files
-        run: find . -name "*.apk"
+      - name: List APK files
+        run: find . -name "*.apk" -type f
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
