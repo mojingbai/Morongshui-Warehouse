@@ -28,12 +28,11 @@ jobs:
           sudo apt-get install -y android-sdk
           echo "ANDROID_HOME=/usr/lib/android-sdk" >> $GITHUB_ENV
 
-      # 自动生成 gradlew，解决文件缺失问题
+      # 自动生成完整 Gradle wrapper，不用你电脑上有任何文件
       - name: Generate Gradle wrapper
         run: |
-          if [ ! -f ./gradlew ]; then
-            gradle wrapper
-          fi
+          sudo apt-get install -y gradle
+          gradle wrapper --gradle-version 8.5
 
       - name: Grant execute permission
         run: chmod +x ./gradlew
