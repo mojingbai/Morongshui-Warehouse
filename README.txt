@@ -1,0 +1,1 @@
+This ZIP contains only .github/workflows/build-apk.yml. It is a workflow file, not a complete Android app. It must be placed inside the root of a valid Android project that includes gradlew and app source/build files.
