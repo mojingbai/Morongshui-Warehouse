@@ -2,9 +2,9 @@ name: Build SheepFarmerLite APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -22,11 +22,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # 纯手动安装 Android SDK，避开所有参数兼容问题
       - name: Setup Android SDK
         run: |
           set -e
-          ANDROID_HOME="/usr/local/lib/android-sdk"
+          # 改用当前工作目录，有权限
+          ANDROID_HOME="$GITHUB_WORKSPACE/android-sdk"
           mkdir -p "$ANDROID_HOME"
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH" >> $GITHUB_ENV
