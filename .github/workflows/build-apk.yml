@@ -22,12 +22,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # 不再使用易出错的 setup-android 第三方动作，改用官方推荐方式
       - name: Setup Android SDK
         run: |
           sudo apt-get update
           sudo apt-get install -y android-sdk
           echo "ANDROID_HOME=/usr/lib/android-sdk" >> $GITHUB_ENV
+
+      # 自动生成 gradlew，解决文件缺失问题
+      - name: Generate Gradle wrapper
+        run: |
+          if [ ! -f ./gradlew ]; then
+            gradle wrapper
+          fi
 
       - name: Grant execute permission
         run: chmod +x ./gradlew
