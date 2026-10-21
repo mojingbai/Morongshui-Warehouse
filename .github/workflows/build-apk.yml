@@ -63,22 +63,45 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Build release APK
+      - name: Restore signing keystore
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          set -eu
+          test -n "$KEYSTORE_BASE64"
+          printf '%s' "$KEYSTORE_BASE64" \
+            | tr -d '\r\n' \
+            | base64 --decode > "$RUNNER_TEMP/release.jks"
+          test -s "$RUNNER_TEMP/release.jks"
+
+      - name: Build signed release APK
+        shell: bash
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -eu
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify APK signature
         shell: bash
         run: |
           set -eu
-          ./gradlew assembleRelease --no-daemon --stacktrace
-
-      - name: Find APK
-        if: always()
-        shell: bash
-        run: |
-          find app/build/outputs -type f -name "*.apk" 2>/dev/null || true
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" \
+            verify --verbose "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: SheepFarmerLite-APK
+          name: SheepFarmerLite-Signed-APK
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
